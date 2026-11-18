@@ -10,7 +10,10 @@ A phone experience for Devin's NMDE class (final due **December 6**): **a song w
 ## How composing works
 - **Face = pitch, 5 notes.** Relaxed = middle, raised eyebrows = higher, **open mouth (or frown) = lower**. Frowning was hard for the user, so jawOpen is the main "low". The continuous value P (−1…1) maps to 5 levels with hysteresis, in a yo pentatonic scale (0, 2, 5, 7, 9 semitones). Face lost or no input = a rest. MediaPipe Face Landmarker blendshapes, loaded from jsDelivr at runtime.
 - **A gentle beat:** soft wooden ticks (accent and a light taiko every 4), and a koto pluck of your current note on each beat. Your shakuhachi follows your face continuously, with vibrato that blooms when you hold a note.
-- **The song is painted** as one ink line across the scroll (left→right = time, up/down = pitch), with jade strands and a soft wash, over five faint guides. Silences break the line. A red seal is stamped at the end.
+- **The song is painted as a sumi brushstroke** (`brushSegs`) across the scroll: left→right = time, up/down = pitch. It's a filled ribbon that is fat where a note is held and thin where the brush moves fast; it presses in at the start, tapers as it lifts, pools ink where it settles onto a note, has a soft wash around it, and shows dry, broken bristle streaks toward the tail (not on the stroke still being painted, so it doesn't flicker). Silences break the line, five faint guides show while you play, and a red seal is stamped at the end. The same renderer draws the small song line on the scroll card.
+
+## The message card: a hanging scroll
+Send and receive screens show the message as a hanging scroll: dark wooden rods, a lighter paper sheet that unrolls (CSS grid-rows 0fr→1fr), "For Sam" at the top, the messenger, your brushed song, "The Crane" and what it carries, and the sender's name as a red seal stamp in the corner. The To/From names update on the scroll as you type. Show QR swaps the animal for the QR code inside the scroll. After a real share-sheet send, the scroll rolls up and flies off (the messenger carries it), then comes back rolled; tap to unroll. Copying the link doesn't animate. Ghost and link buttons get a paper backing so they read over the grass.
 - **Recorded as** 24 notes (each beat = the level held longest, or `-`) plus the ink line resampled to 8 points per beat (192 base-36 characters).
 
 ## The messenger (which animal carries it)
@@ -40,7 +43,7 @@ Press and drag up/down, arrow keys, a PlayStation/Xbox left stick, or the Arduin
 ## Files
 - `src/app.html` — **edit this.** The whole page (HTML, CSS, JS).
 - `tools/build.py` — copies it to `index.html`. **Run `python3 tools/build.py` after every edit.**
-- `index.html` — the built page (about 73 KB). Don't hand-edit it.
+- `index.html` — the built page (about 81 KB). Don't hand-edit it.
 - `archive/app-follow-the-song.html` — the previous version (continuous follow-the-threads song, two-animal race, reveal, saved scroll), kept in case parts are wanted back.
 - `songs/`, `tools/analyze.py`, `tools/cut-reference.py` — left over from the soundtrack version; not used.
 
