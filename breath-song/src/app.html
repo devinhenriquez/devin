@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Breath Song</title>
+<meta name="description" content="A song without words: play a feeling with your face and send it to someone.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;800&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap">
+<style>
+/* A song without words. Your face plays a short song over a gentle beat (eyebrows up = higher, open mouth = lower),
+   painted as an ink line across an old scroll. An animal carries it to someone as a link; they hear it and can answer. */
+:root{
+  --paper:#E6D5B2; --paper2:#CDB289; --ink:#221B14; --ink2:#5C4A35; --seal:#A8322A;
+  --display:'Shippori Mincho','Hiragino Mincho ProN',Georgia,serif;
+  --body:'Zen Kaku Gothic New','Hiragino Sans',system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--paper2);color:var(--ink);font-family:var(--body);overflow:hidden;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px));
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+canvas#stage{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+main{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+main button,main input,main label,main a{pointer-events:auto}
+.screen{display:flex;flex-direction:column;align-items:center;gap:16px;max-width:30rem;width:100%;animation:fade .6s ease-out both}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(40px,10.5vw,68px);line-height:1.05;margin:0;color:var(--ink);letter-spacing:.02em}
+h1.smaller{font-size:clamp(32px,8.5vw,52px)}
+p{margin:0;font-size:17px;line-height:1.6}
+.small{font-size:14px;color:var(--ink2)}
+.label{font-size:13px;letter-spacing:.24em;text-transform:uppercase;color:var(--seal);font-weight:500}
+button{font:500 17px var(--body);color:var(--paper);background:var(--ink);border:0;border-radius:999px;padding:14px 28px;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:1.5px solid rgba(34,27,20,.6)}
+button.link{background:none;color:var(--ink2);padding:6px 10px;font-size:15px;text-decoration:underline;text-underline-offset:3px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--seal);outline-offset:3px}
+.row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;width:100%}
+/* the camera, painted onto the scroll as a small portrait */
+.portrait{position:fixed;z-index:2;top:calc(env(safe-area-inset-top,0px) + 14px);right:max(14px,env(safe-area-inset-right,0px));width:72px;height:72px;border-radius:50%;overflow:hidden;border:2px solid rgba(34,27,20,.7);pointer-events:none;
+  transition:top .9s cubic-bezier(.2,.7,.2,1),right .9s cubic-bezier(.2,.7,.2,1),width .9s cubic-bezier(.2,.7,.2,1),height .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
+.portrait video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;filter:grayscale(1) sepia(.55) contrast(1.4) brightness(1.08);mix-blend-mode:multiply;opacity:.9}
+.portrait canvas{position:absolute;inset:0;width:100%;height:100%}
+.portrait.lost{border-color:var(--seal)}
+/* the face scan: the portrait grows to the centre while ink dots trace your face */
+.portrait.big{top:46%;right:50%;width:min(62vw,250px);height:min(62vw,250px);transform:translate(50%,-50%);border-width:3px}
+#ring{position:fixed;z-index:3;top:46%;left:50%;width:calc(min(62vw,250px) + 24px);aspect-ratio:1;transform:translate(-50%,-50%) rotate(-90deg);pointer-events:none}
+/* play overlay */
+.overlay{position:fixed;inset:0;display:block;max-width:none}
+.hud{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 24px);display:flex;flex-direction:column;align-items:center;gap:12px;padding:0 100px}
+.bar{width:min(60vw,240px);height:3px;border-radius:2px;background:rgba(34,27,20,.15);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--seal)}
+.hint{font-family:var(--display);font-weight:800;font-size:22px;color:var(--ink);min-height:1.5em;line-height:1.3}
+.sub{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 24%);font-size:16px;color:var(--ink);min-height:1.6em;padding:0 16px}
+.foot{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);font-size:13px;color:rgba(230,213,178,.85);padding:0 16px}
+/* send and receive cards */
+.art{width:min(52vw,28vh,230px);aspect-ratio:1;animation:bleed 2.2s ease-out both}
+.art svg{width:100%;height:100%;display:block;overflow:visible}
+#s-send .art{width:min(40vw,20vh,170px)}
+@keyframes bleed{0%{opacity:0;filter:blur(10px);transform:scale(.96)}60%{opacity:1}100%{opacity:1;filter:blur(0);transform:none}}
+#s-send,#s-heard{gap:12px}
+.fields{display:flex;gap:10px;width:100%;max-width:22rem}
+.fields label{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
+.fields input{width:100%;font:16px var(--body);color:var(--ink);background:rgba(246,238,220,.75);border:1.5px solid rgba(34,27,20,.35);border-radius:10px;padding:10px 12px;-webkit-user-select:text;user-select:text;touch-action:auto}
+#qr{width:min(56vw,30vh,240px);aspect-ratio:1;background:#F6EEDC;padding:10px;border-radius:12px;pointer-events:auto}
+#qr svg{width:100%;height:100%;display:block}
+#sent-note{min-height:1.5em;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text;pointer-events:auto}
+@media (max-width:599px){.hud{padding:0 16px;top:calc(env(safe-area-inset-top,0px) + 98px)}.hint{font-size:20px}}
+@media (max-height:760px){p{font-size:15px}#s-send .art,#s-send #qr{width:min(32vw,15vh)}.art{width:min(44vw,22vh)}#s-send,#s-heard{gap:9px}
+  #s-send button{padding:12px 22px}#s-send .label{display:none}.fields input{padding:8px 10px}}
+/* projector mode (?projector): bigger everything, a big portrait so the room sees the face */
+.projector .hint{font-size:40px}.projector .sub{font-size:26px}
+.projector .portrait{width:220px;height:220px;border-width:3px}.projector .portrait.big{width:420px;height:420px}.projector #ring{width:446px}
+.projector .hud{padding:0 260px}
+@media (prefers-reduced-motion:reduce){.screen,.art{animation:none}.portrait{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="portrait" id="portrait" hidden><video id="cam" playsinline muted autoplay></video><canvas id="dots"></canvas></div>
+<svg id="ring" viewBox="0 0 100 100" aria-hidden="true" hidden><circle cx="50" cy="50" r="48" fill="none" stroke="rgba(34,27,20,.15)" stroke-width="1.2"/><circle id="ring-arc" cx="50" cy="50" r="48" fill="none" stroke="#A8322A" stroke-width="2" stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="301.6"/></svg>
+<main>
+  <section class="screen" id="s-start">
+    <p class="label">A song without words</p>
+    <h1>Breath Song</h1>
+    <p>Send someone a feeling instead of a message. The forest reads your face, you play a short song with it, and an animal carries the song to them. They can answer with their own face.</p>
+    <button id="begin">Begin</button>
+    <p class="small">Turn your sound on. Your phone will ask for the camera. Your face never leaves your phone; only the song is sent.</p>
+  </section>
+
+  <section class="screen" id="s-recv" hidden>
+    <p class="label">A song without words</p>
+    <h1 class="smaller" id="recv-title">Someone sent you a song</h1>
+    <p>An animal is bringing it to you. Turn your sound on.</p>
+    <button id="listen">Listen</button>
+  </section>
+
+  <section class="screen" id="s-wake" hidden>
+    <p class="label">Waking the forest</p>
+    <p id="wake-text">Opening the camera…</p>
+  </section>
+
+  <section class="screen overlay" id="s-play" hidden>
+    <div class="hud">
+      <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+      <p class="hint" id="hint"></p>
+    </div>
+    <p class="sub" id="sub"></p>
+    <p class="foot" id="foot"></p>
+  </section>
+
+  <section class="screen" id="s-send" hidden>
+    <p class="label">Your song is ready</p>
+    <div class="art" id="send-art" role="img"></div>
+    <div id="qr" hidden></div>
+    <h1 class="smaller" id="send-name"></h1>
+    <p id="send-mood"></p>
+    <div class="fields">
+      <label>To<input id="to" maxlength="24" placeholder="their name" autocomplete="off"></label>
+      <label>From<input id="from" maxlength="24" placeholder="your name" autocomplete="off"></label>
+    </div>
+    <div class="row"><button id="send">Send it</button><button class="ghost" id="qr-btn">Show QR</button></div>
+    <p class="small" id="sent-note"></p>
+    <div class="row"><button class="link" id="preview">Hear it as they will</button><button class="link" id="redo">Play a new one</button></div>
+  </section>
+
+  <section class="screen" id="s-heard" hidden>
+    <p class="label" id="heard-label"></p>
+    <div class="art" id="heard-art" role="img"></div>
+    <h1 class="smaller" id="heard-name"></h1>
+    <p id="heard-msg"></p>
+    <div class="row"><button id="answer">Answer with your face</button><button class="ghost" id="relisten">Listen again</button></div>
+  </section>
+</main>
+
+<script>
+/* ================= the animals =================
+   art: ink silhouettes drawn in a 200 x 200 box (ground at about y 186).
+   root: the animal's key (Hz). step: its tempo (seconds per note in its call). sig: its own 4-note call (0 low, 1 middle, 2 high).
+   instr: what it plays when it answers you. hint: what drifts across the scroll as it comes closer. */
+const PAPER = '#E6D5B2', INK = '#221B14', SEAL = '#A8322A';
+const ANIMALS = {
+  monkey: {name: 'Monkey', root: 349.2, step: .42, sig: [2, 1, 2, 0], instr: 'shamisen', echo: 2, hint: 'maple',
+    text: 'Bold, playful and curious. You fill a quiet forest with noise and make everyone laugh.',
+    haiku: 'Laughter in the pines,\na red face among the snow.\nThe whole hill wakes up.',
+    art: `<path d="M58 186C38 168 40 124 68 104C88 90 120 92 138 108C156 124 160 162 142 186Z"/>
+      <path d="M100 38C82 38 68 50 68 70C64 74 62 80 66 86C70 100 84 108 100 108C116 108 130 100 134 86C138 80 136 74 132 70C132 50 118 38 100 38Z"/>
+      <circle cx="65" cy="76" r="10"/><circle cx="135" cy="76" r="10"/>
+      <path d="M78 46C84 38 92 36 100 37C108 36 116 38 122 46C112 42 88 42 78 46Z"/>
+      <ellipse cx="101" cy="78" rx="17" ry="19" fill="${SEAL}"/>
+      <circle cx="94" cy="73" r="2.6"/><circle cx="108" cy="73" r="2.6"/>
+      <path d="M95 90Q101 94 107 90" fill="none" stroke-width="2"/>
+      <path d="M66 122C60 142 70 164 92 170L104 162C90 154 84 138 84 122Z"/>
+      <path d="M136 124C142 144 132 164 110 170L100 162C114 154 120 138 120 124Z"/>`},
+  bear: {name: 'Bear', root: 220, step: .8, sig: [1, 0, 1, 0], instr: 'flute', echo: 1, hint: 'paw',
+    text: 'Calm, cozy and protective. You hold your ground and keep the people close to you safe.',
+    haiku: 'Slow steps through the ferns.\nThe mountain breathes as you breathe.\nNothing here will fall.',
+    art: `<path d="M24 124C22 94 44 72 76 68C98 64 112 58 128 62C142 66 150 74 156 84C166 82 178 88 184 96L194 104C194 112 186 116 176 116C168 120 160 120 152 118C150 132 146 142 142 150L146 186H124L120 156C104 160 84 160 70 156L68 186H46L46 150C32 144 24 136 24 124Z"/>
+      <circle cx="156" cy="80" r="7"/>
+      <circle cx="184" cy="100" r="2" fill="${PAPER}"/>`},
+  deer: {name: 'Deer', root: 329.6, step: .62, sig: [1, 2, 1, 0], instr: 'koto', echo: 2, hint: 'bamboo',
+    text: 'Gentle, dreamy and peaceful. You move softly and notice what others miss.',
+    haiku: 'Soft eyes in the mist.\nA single leaf turns, unseen,\nbut you saw it fall.',
+    art: `<path d="M58 96C80 84 124 84 140 92C152 98 152 118 140 125C120 132 80 132 62 125C50 118 48 102 58 96Z"/>
+      <path d="M126 98C134 82 140 66 146 54L160 58C156 74 152 92 148 106Z"/>
+      <path d="M144 50C148 42 162 42 168 50L186 62C186 69 180 71 172 69L160 66C150 66 142 60 144 50Z"/>
+      <path d="M150 48L138 38L156 42Z"/>
+      <g fill="none" stroke-width="3.2"><path d="M152 46C150 32 146 22 138 12"/><path d="M149 32L160 20"/><path d="M145 22L132 16"/>
+      <path d="M158 46C162 34 166 24 174 14"/><path d="M163 32L176 26"/></g>
+      <g fill="none" stroke-width="4.5"><path d="M68 122L62 186"/><path d="M80 124L86 186"/><path d="M128 124L122 186"/><path d="M138 120L146 186"/></g>
+      <path d="M58 98L46 92L54 106Z"/>`},
+  fox: {name: 'Fox', root: 293.7, step: .5, sig: [0, 2, 0, 1], instr: 'shamisen', echo: 2, hint: 'flame',
+    text: 'Mysterious, clever and a little strange. You lead others somewhere they didn\'t expect to go.',
+    haiku: 'A lantern in fog.\nYou lead them down a new path;\nno one asks you why.',
+    art: `<path d="M70 186C54 170 56 136 78 118C86 102 96 92 106 84L130 84C132 104 128 120 134 142C140 162 138 178 130 186Z"/>
+      <path d="M104 86C98 72 102 58 112 50L110 22L126 42C132 42 136 44 142 48L154 24L154 52C160 58 166 64 176 70C170 78 154 80 140 82C128 90 114 92 104 86Z"/>
+      <path d="M72 184C38 188 14 172 18 146C22 126 40 120 50 134C42 146 46 164 64 168C82 172 98 174 116 186Z"/>
+      <path d="M20 146C18 136 24 128 32 126C28 134 28 142 30 150Z" fill="${PAPER}" fill-opacity=".8"/>
+      <circle cx="146" cy="62" r="2.2" fill="${PAPER}"/>`},
+  owl: {name: 'Owl', root: 392, step: .66, sig: [2, 1, 2, 1], instr: 'flute', echo: 2, hint: 'feather',
+    text: 'Observant, sharp and independent. You watch first and speak when it matters.',
+    haiku: 'Moon over the pines.\nYou have watched the whole night long;\nnow you speak one word.',
+    art: `<path d="M100 40C140 40 150 80 148 115C146 150 128 170 100 170C72 170 54 150 52 115C50 80 60 40 100 40Z"/>
+      <path d="M68 54L58 20L88 44Z"/><path d="M132 54L142 20L112 44Z"/>
+      <circle cx="81" cy="80" r="15" fill="${PAPER}"/><circle cx="119" cy="80" r="15" fill="${PAPER}"/>
+      <circle cx="83" cy="81" r="6.5"/><circle cx="117" cy="81" r="6.5"/>
+      <path d="M100 90L94 99L100 110L106 99Z" fill="${PAPER}" fill-opacity=".75"/>
+      <g fill="none" stroke="${PAPER}" stroke-opacity=".45" stroke-width="2"><path d="M80 124L86 130L92 124"/><path d="M108 124L114 130L120 124"/><path d="M94 140L100 146L106 140"/><path d="M80 152L86 158L92 152"/><path d="M108 152L114 158L120 152"/></g>
+      <path d="M6 178C60 168 140 176 196 166" fill="none" stroke-width="9"/>
+      <path d="M150 172C162 160 170 158 182 156" fill="none" stroke-width="4"/>
+      <g fill="none" stroke-width="3.5"><path d="M86 168L82 178M92 168L92 178"/><path d="M108 168L108 178M114 168L118 178"/></g>`},
+  cat: {name: 'Cat', root: 329.6, step: .55, sig: [0, 2, 1, 2], instr: 'koto', echo: 2, hint: 'paw',
+    text: 'Confident and proud. You walk in like you own the place, and somehow everyone agrees.',
+    haiku: 'Sun on the warm tiles.\nYou arrive as if invited,\nand everyone agrees.',
+    art: `<path d="M68 186C58 160 60 130 76 112C86 102 114 102 124 112C140 130 142 160 132 186Z"/>
+      <path d="M74 90C74 72 86 62 100 62C114 62 126 72 126 90C126 104 114 112 100 112C86 112 74 104 74 90Z"/>
+      <path d="M78 78L74 46L96 66Z"/><path d="M122 78L126 46L104 66Z"/>
+      <path d="M80 72L79 56L88 66Z" fill="${PAPER}" fill-opacity=".35"/><path d="M120 72L121 56L112 66Z" fill="${PAPER}" fill-opacity=".35"/>
+      <path d="M130 182C164 184 176 160 164 138C158 128 148 130 152 142" fill="none" stroke-width="10"/>`},
+  crane: {name: 'Crane', root: 440, step: .7, sig: [1, 0, 1, 2], instr: 'flute', echo: 2, hint: 'feather',
+    text: 'Adventurous and free. You are always looking past the horizon for the next place to go.',
+    haiku: 'Wings above the marsh.\nThe horizon keeps moving,\nso you follow it.',
+    art: `<ellipse cx="96" cy="104" rx="44" ry="24" transform="rotate(-14 96 104)"/>
+      <path d="M58 106C38 114 30 136 38 152C50 138 62 126 80 120Z"/>
+      <path d="M52 112C36 126 36 144 46 156C52 142 60 132 70 124Z"/>
+      <path d="M126 96C142 80 132 60 148 44" fill="none" stroke-width="8"/>
+      <circle cx="150" cy="41" r="8"/>
+      <path d="M155 38L190 47L155 45Z"/>
+      <circle cx="148" cy="35" r="3.6" fill="${SEAL}"/>
+      <g fill="none" stroke-width="3"><path d="M92 124L96 186"/><path d="M104 122L112 158L96 166"/></g>
+      <path d="M78 96C96 90 114 92 128 98" fill="none" stroke="${PAPER}" stroke-opacity=".35" stroke-width="2"/>`}
+};
+const NEUTRAL = {root: 293.7};
+const STEPS = [0, 5, 9];   // low, middle, high: a pentatonic fourth and a sixth above the key
+const freqOf = (root, lvl) => root * Math.pow(2, STEPS[lvl] / 12);
+let svgN = 0;
+function svgFor(k){
+  const id = 'ink' + (++svgN);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><filter id="${id}" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="3" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feTurbulence type="fractalNoise" baseFrequency=".02 .16" numOctaves="2" seed="3" result="s"/>
+    <feColorMatrix in="s" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 2.2 -.6" result="sa"/>
+    <feComposite in="d" in2="sa" operator="arithmetic" k1="-.2" k2="1" k3="0" k4="0" result="dry"/>
+    <feGaussianBlur in="d" stdDeviation="2.4" result="b"/>
+    <feComponentTransfer in="b" result="bleed"><feFuncA type="linear" slope=".4"/></feComponentTransfer>
+    <feMerge><feMergeNode in="bleed"/><feMergeNode in="dry"/></feMerge></filter></defs>
+    <ellipse cx="100" cy="189" rx="76" ry="6" fill="${INK}" fill-opacity=".14"/>
+    <g filter="url(#${id})" fill="${INK}" stroke="${INK}" stroke-linecap="round" stroke-linejoin="round">${ANIMALS[k].art}</g></svg>`;
+}
+const svgImage = k => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgFor(k)); });
+
+/* ================= helpers ================= */
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = (k, dt) => 1 - Math.exp(-dt * k);          // frame-rate independent smoothing
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function show(id){ for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id; }
+const textCache = new Map();
+function setText(el, t){ if (textCache.get(el) !== t){ textCache.set(el, t); el.textContent = t; } }
+function setHTML(el, h){ if (textCache.get(el) !== h){ textCache.set(el, h); el.innerHTML = h; } }
+function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const median = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)] || 0; };
+const smooth = k => k * k * (3 - 2 * k);
+if (/[?&]projector/.test(location.search)) document.documentElement.classList.add('projector');
+const ICON = {
+  up: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="9"/><path d="M6.5 7.6q2.3-2.6 4.6 0M12.9 7.6q2.3-2.6 4.6 0"/><path d="M9 11v.1M15 11v.1M9.5 17h5"/><path d="M12 1.5v2.2M10.6 2.9 12 1.5l1.4 1.4"/></svg>',
+  down: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="11" r="9"/><path d="M7 8h3.5M13.5 8H17"/><path d="M9 10.5v.1M15 10.5v.1"/><ellipse cx="12" cy="15.6" rx="2.2" ry="2.8"/><path d="M12 20.3v2.2M10.6 21.1 12 22.5l1.4-1.4"/></svg>'
+};
+
+/* ================= sound: shakuhachi (you), koto and shamisen (plucked), shō (the drone), taiko ================= */
+let ac, master, verb, noiseBuf, fluteWave, player, drone;
+function audioInit(){
+  ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume();
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -18; comp.connect(ac.destination);
+  master = ac.createGain(); master.gain.value = .9; master.connect(comp);
+  const n = ac.sampleRate * 3.2, ir = ac.createBuffer(2, n, ac.sampleRate);   // a wooden hall, made from fading noise
+  for (let c = 0; c < 2; c++){ const d = ir.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2) * (i < 200 ? i / 200 : 1); }
+  verb = ac.createConvolver(); verb.buffer = ir; const vg = ac.createGain(); vg.gain.value = .38; verb.connect(vg).connect(comp);
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+  const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  // a bamboo flute's tone: strong fundamental, a little of the next few overtones
+  fluteWave = ac.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0, 0, 0]), new Float32Array([0, 1, .34, .16, .07, .035, .015]));
+  // wind
+  const w = ac.createBufferSource(); w.buffer = noiseBuf; w.loop = true;
+  const wl = ac.createBiquadFilter(); wl.type = 'lowpass'; wl.frequency.value = 380;
+  const wg = ac.createGain(); wg.gain.value = .02;
+  const wlfo = ac.createOscillator(); wlfo.frequency.value = .08; const wlg = ac.createGain(); wlg.gain.value = .014;
+  wlfo.connect(wlg).connect(wg.gain); w.connect(wl).connect(wg).connect(master); w.start(); wlfo.start();
+  player = makeFlute();
+  drone = makeDrone(NEUTRAL.root);
+}
+function send(node, dry = 1){ if (dry === 1) node.connect(master); else { const g = ac.createGain(); g.gain.value = dry; node.connect(g).connect(master); } node.connect(verb); }
+/* your shakuhachi: always running, its breath and brightness follow how well you're on the line */
+function makeFlute(){
+  const o = ac.createOscillator(); o.setPeriodicWave(fluteWave);
+  const lfo = ac.createOscillator(); lfo.frequency.value = 5.2; const lg = ac.createGain(); lg.gain.value = 0;
+  const jit = ac.createBufferSource(); jit.buffer = noiseBuf; jit.loop = true; jit.playbackRate.value = .0015;   // slow, uneven wavering of a real breath
+  const jg = ac.createGain(); jg.gain.value = 1.2; jit.connect(jg).connect(o.frequency);
+  lfo.connect(lg).connect(o.frequency);
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1200; lp.Q.value = .7;
+  const amp = ac.createGain(); amp.gain.value = 0;
+  const trem = ac.createGain(); trem.gain.value = 1; const tl = ac.createBufferSource(); tl.buffer = noiseBuf; tl.loop = true; tl.playbackRate.value = .004;
+  const tg = ac.createGain(); tg.gain.value = .12; tl.connect(tg).connect(trem.gain);
+  o.connect(lp).connect(trem).connect(amp); send(amp);
+  // breath: hiss near the note plus a high airy edge
+  const ns = ac.createBufferSource(); ns.buffer = noiseBuf; ns.loop = true;
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 3;
+  const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 5000;
+  const bg = ac.createGain(); bg.gain.value = 0; const hg = ac.createGain(); hg.gain.value = 0;
+  ns.connect(bp).connect(bg); ns.connect(hp).connect(hg); send(bg); send(hg, .6);
+  for (const s of [o, lfo, jit, tl, ns]) s.start();
+  return {o, lg, lp, amp, bp, bg, hg};
+}
+/* one shakuhachi note: scoop into the pitch, a puff of breath, vibrato that blooms late */
+function fluteNote(t, f, dur, vol = .16){
+  const o = ac.createOscillator(); o.setPeriodicWave(fluteWave);
+  o.frequency.setValueAtTime(f * .955, t); o.frequency.exponentialRampToValueAtTime(f, t + .09);
+  const lfo = ac.createOscillator(); lfo.frequency.value = 5.3; const lg = ac.createGain();
+  lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, t + Math.min(dur * .45, .35)); lg.gain.linearRampToValueAtTime(f * .011, t + dur);
+  lfo.connect(lg).connect(o.frequency);
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(900, t); lp.frequency.linearRampToValueAtTime(2600, t + .12);
+  const env = ac.createGain(); env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(vol, t + .08);
+  env.gain.linearRampToValueAtTime(vol * .8, t + dur * .7); env.gain.setTargetAtTime(0, t + dur, .09);
+  o.connect(lp).connect(env); send(env);
+  const ns = ac.createBufferSource(); ns.buffer = noiseBuf;
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * 1.5; bp.Q.value = 1.4;
+  const ng = ac.createGain(); ng.gain.setValueAtTime(0, t); ng.gain.linearRampToValueAtTime(vol * .9, t + .03);
+  ng.gain.setTargetAtTime(vol * .16, t + .05, .05); ng.gain.setTargetAtTime(0, t + dur, .07);
+  ns.connect(bp).connect(ng); send(ng);
+  const end = t + dur + .8; for (const s of [o, lfo]){ s.start(t); s.stop(end); } ns.start(t, Math.random()); ns.stop(end);
+}
+/* koto and shamisen: plucked strings made with the Karplus-Strong method, rendered once per pitch */
+const pluckCache = new Map();
+function pluckBuf(f, kind){
+  const key = kind + Math.round(f * 10); if (pluckCache.has(key)) return pluckCache.get(key);
+  const sr = ac.sampleRate, len = Math.floor(sr * (kind === 'koto' ? 2.4 : 1.3)), b = ac.createBuffer(1, len, sr), y = b.getChannelData(0);
+  const P = sr / f - .5, decay = kind === 'koto' ? .9965 : .9925, R = rng(Math.round(f));
+  let prev = 0;
+  for (let i = 0; i < len; i++){
+    if (i < Math.ceil(P) + 1){ const r = R() * 2 - 1; prev = kind === 'koto' ? prev * .5 + r * .5 : r; y[i] = prev; continue; }   // the pluck: softer noise for koto
+    const a = i - P, k = Math.floor(a), u = a - k;
+    const s0 = y[k] * (1 - u) + y[k + 1 > i - 1 ? k : k + 1] * u, s1 = y[k - 1] * (1 - u) + y[k] * u;
+    y[i] = decay * (kind === 'koto' ? (s0 + s1) * .5 : s0 * .7 + s1 * .3);
+  }
+  if (kind === 'shamisen'){ for (let i = 1; i < len; i++) y[i] += .25 * Math.tanh(4 * y[i]) * Math.exp(-i / (sr * .25)); }   // the buzz of a shamisen string
+  let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(y[i])); for (let i = 0; i < len; i++) y[i] /= pk || 1;
+  pluckCache.set(key, b); return b;
+}
+function pluck(t, f, vol = .2, kind = 'koto'){
+  const s = ac.createBufferSource(); s.buffer = pluckBuf(f, kind);
+  const g = ac.createGain(); g.gain.value = vol;
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = kind === 'koto' ? 3800 : 5200;
+  s.connect(lp).connect(g); send(g); s.start(t);
+}
+function taiko(t, vol = .4){
+  const o = ac.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(48, t + .35);
+  const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .006); g.gain.setTargetAtTime(0, t + .02, .22);
+  const n = ac.createBufferSource(); n.buffer = noiseBuf; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+  const ng = ac.createGain(); ng.gain.setValueAtTime(vol * .5, t); ng.gain.setTargetAtTime(0, t, .04);
+  o.connect(g); n.connect(lp).connect(ng); send(g); send(ng);
+  o.start(t); o.stop(t + 1.5); n.start(t, Math.random()); n.stop(t + .4);
+}
+function play(kind, t, f, dur, vol){ if (kind === 'flute') fluteNote(t, f, dur, vol); else pluck(t, f, vol * 1.3, kind); }
+/* shō: a soft, breathing cluster of reeds under everything */
+function makeDrone(root){
+  const out = ac.createGain(); out.gain.value = 0;
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 950;
+  const sw = ac.createOscillator(); sw.frequency.value = .07; const swg = ac.createGain(); swg.gain.value = .006;
+  sw.connect(swg).connect(out.gain); sw.start();
+  lp.connect(out); send(out);
+  const SEMIS = [-12, -5, 0, 2, 7], oscs = [];
+  for (const s of SEMIS) for (const det of [-4, 4]){
+    const o = ac.createOscillator(); o.type = 'sawtooth'; o.detune.value = det; o.frequency.value = root * Math.pow(2, s / 12);
+    const g = ac.createGain(); g.gain.value = s === -12 ? .5 : .28; o.connect(g).connect(lp); o.start(); oscs.push([o, s]);
+  }
+  return {out, oscs, root, set(r){ this.root = r; for (const [o, s] of oscs) o.frequency.setTargetAtTime(r * Math.pow(2, s / 12), ac.currentTime, .9); },
+          level(v, tc = 1.2){ out.gain.setTargetAtTime(v, ac.currentTime, tc); }};
+}
+
+/* ================= face → pitch ================= */
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+async function loadFace(){
+  try {
+    const v = await import(MP + '/vision_bundle.mjs');
+    const files = await v.FilesetResolver.forVisionTasks(MP + '/wasm');
+    const opts = d => ({baseOptions: {modelAssetPath: MODEL, delegate: d}, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true});
+    try { return await v.FaceLandmarker.createFromOptions(files, opts('GPU')); }
+    catch (e) { return await v.FaceLandmarker.createFromOptions(files, opts('CPU')); }
+  } catch (e) { console.warn('Face reader failed to load', e); return null; }
+}
+let fl = null, cam = $('cam'), camOK = false, lastDetect = 0, faceSeen = -1e9, prevNose = null;
+const face = {up: 0, down: 0}, base = {up: .1, down: .05}, range = {up: .22, down: .2};
+let calibrated = false, P = 0, lvl = 1;   // P: -1 (low) … 0 (relaxed) … 1 (high). lvl: 0 / 1 / 2
+const calmUp = [], calmDown = [];
+/* what the face is doing, for picking the animal */
+const acc = {n: 0, sum: {}, nBrow: 0, brow: 0, nLow: 0, jaw: 0, stare: 0, mv: 0};
+function frameFeatures(res, prev){
+  const b = {}; for (const c of res.faceBlendshapes[0].categories) b[c.categoryName] = c.score;
+  const L = res.faceLandmarks[0], eL = L[33], eR = L[263], nose = L[1], chin = L[152];
+  const mid = {x: (eL.x + eR.x) / 2, y: (eL.y + eR.y) / 2}, ed = Math.hypot(eR.x - eL.x, eR.y - eL.y) || 1e-3;
+  const roll = Math.abs(Math.atan2(eR.y - eL.y, eR.x - eL.x)) * 57.3, roll2 = Math.min(roll, 180 - roll);
+  const yaw = Math.abs((nose.x - mid.x) / ed), pitch = (nose.y - mid.y) / Math.max(chin.y - mid.y, 1e-3);
+  const smile = ((b.mouthSmileLeft || 0) + (b.mouthSmileRight || 0)) / 2;
+  const lookSide = Math.max(b.eyeLookOutLeft || 0, b.eyeLookOutRight || 0, b.eyeLookInLeft || 0, b.eyeLookInRight || 0);
+  const browDown = ((b.browDownLeft || 0) + (b.browDownRight || 0)) / 2;
+  return {
+    nose,
+    up: (b.browInnerUp || 0) * .55 + ((b.browOuterUpLeft || 0) + (b.browOuterUpRight || 0)) / 2 * .45,
+    // low: an open mouth (easy and reliable) or a frown, whichever is bigger
+    down: Math.max((b.jawOpen || 0) * .8, browDown * 1.1, ((b.mouthFrownLeft || 0) + (b.mouthFrownRight || 0)) / 2 * .7),
+    f: {
+      smile, jaw: b.jawOpen || 0,
+      brow: clamp(((b.browInnerUp || 0) + ((b.browOuterUpLeft || 0) + (b.browOuterUpRight || 0)) / 2) / 1.2),
+      stare: clamp(browDown * 1.5 + (1 - smile) * (1 - lookSide) * .3),
+      blink: clamp(((b.eyeBlinkLeft || 0) + (b.eyeBlinkRight || 0)) / 2 * 1.4),
+      up: clamp(((b.eyeLookUpLeft || 0) + (b.eyeLookUpRight || 0)) / 2 * 1.5),
+      away: clamp(Math.max(lookSide, yaw / .25)),
+      tilt: clamp((roll2 - 4) / 16),
+      chin: clamp((.42 - pitch) / .12),
+      mv: prev ? Math.hypot(nose.x - prev.x, nose.y - prev.y) / ed : 0
+    }
+  };
+}
+function detect(now){
+  if (!fl || !camOK || cam.readyState < 2 || now - lastDetect < 45) return;   // about 20 reads a second keeps the phone smooth
+  lastDetect = now;
+  let res; try { res = fl.detectForVideo(cam, now); } catch (e) { return; }
+  if (!(res.faceLandmarks && res.faceLandmarks.length && res.faceBlendshapes && res.faceBlendshapes.length)){ prevNose = null; return; }
+  const r = frameFeatures(res, prevNose); prevNose = r.nose; faceSeen = now;
+  face.up = r.up; face.down = r.down; lastLm = res.faceLandmarks[0];
+  if (phase !== 'play') return;
+  if (G.stage === 'scan'){
+    scan.n++; scan.mv += r.f.mv; for (const k in r.f) if (k !== 'mv') scan.sum[k] = (scan.sum[k] || 0) + r.f[k];
+    if (now - scan.shown > 450){   // change the words slowly so they can be read
+      scan.shown = now;
+      const live = Object.entries(r.f).filter(([k]) => SAID[k]).sort((a, b) => b[1] - a[1]).filter(([, v]) => v > .35).slice(0, 2).map(([k]) => SAID[k]);
+      setText($('sub'), live.length ? live.join(' · ') : 'calm');
+    }
+    return;
+  }
+  if (G.stage === 'calm'){ calmUp.push(r.up); calmDown.push(r.down); }
+  if (G.stage === 'calm' || G.stage === 'count' || G.stage === 'compose'){   // everything your face does while you play counts toward the messenger
+    acc.n++; acc.mv += r.f.mv; for (const k in r.f) if (k !== 'mv') acc.sum[k] = (acc.sum[k] || 0) + r.f[k];
+  }
+}
+const faceLive = now => fl && camOK && now - faceSeen < 600;
+/* the face scan: what it noticed, and the ink dots it draws over your portrait */
+const SAID = {smile: 'smiling', jaw: 'mouth open', blink: 'soft eyes', away: 'looking away',
+  tilt: 'head tilted', stare: 'steady stare', brow: 'eyebrows up', chin: 'chin up', up: 'looking up'};
+let lastLm = null;
+const scan = {n: 0, sum: {}, mv: 0, shown: 0};
+const dotsCv = $('dots'), dg = dotsCv.getContext('2d');
+function drawDots(on){
+  const s = Math.round(dotsCv.clientWidth * D);
+  if (dotsCv.width !== s){ dotsCv.width = dotsCv.height = s; }
+  dg.clearRect(0, 0, s, s);
+  if (!on || !lastLm || !cam.videoWidth) return;
+  const vw = cam.videoWidth, vh = cam.videoHeight, k = Math.max(s / vw, s / vh), ox = (s - vw * k) / 2, oy = (s - vh * k) / 2;
+  dg.fillStyle = 'rgba(34,27,20,.75)';
+  for (let i = 0; i < lastLm.length; i += 4){ const x = s - (ox + lastLm[i].x * vw * k), y = oy + lastLm[i].y * vh * k; dg.beginPath(); dg.arc(x, y, 1.1 * D, 0, 7); dg.fill(); }
+}
+
+/* ================= other ways to play: touch, arrow keys, PlayStation / Xbox, the Arduino flute ================= */
+let held = false, pointerP = 0, keyDir = 0;
+const pad = {active: false, p: 0, lastUse: -1e9, prevBtn: [], gp: null};
+function readPad(now){
+  let list = []; try { list = navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) {}   // some browsers block gamepads on file pages
+  let gp = null; for (const x of list) if (x && x.connected){ gp = x; break; }
+  if (!gp){ pad.active = false; return; }
+  const flute = /2341|arduino|leonardo/i.test(gp.id);   // the flute (Leonardo as a gamepad): Y axis = pitch
+  const y = flute ? -gp.axes[1] : (Math.abs(gp.axes[1] || 0) > Math.abs(gp.axes[3] || 0) ? -gp.axes[1] : -(gp.axes[3] || 0));
+  const p = clamp(y || 0, -1, 1);
+  if (Math.abs(p) > .2) pad.lastUse = now;
+  pad.active = now - pad.lastUse < 3000; pad.p = p; pad.gp = gp;
+  const pressed = i => gp.buttons[i] && gp.buttons[i].pressed && !pad.prevBtn[i];
+  if (phase === 'heard' && pressed(0)) $('answer').click();   // A / Cross answers a song
+  if (phase === 'start' && pressed(0)) begin();
+  pad.prevBtn = gp.buttons.map(b => b.pressed);
+}
+function rumble(){ const v = pad.gp && pad.gp.vibrationActuator; if (v && v.playEffect) v.playEffect('dual-rumble', {duration: 80, weakMagnitude: .5, strongMagnitude: .2}).catch(() => {}); }
+addEventListener('keydown', e => { if (e.key === 'ArrowUp') keyDir = 1; else if (e.key === 'ArrowDown') keyDir = -1; });
+addEventListener('keyup', e => { if ((e.key === 'ArrowUp' && keyDir > 0) || (e.key === 'ArrowDown' && keyDir < 0)) keyDir = 0; });
+function ptr(e){ pointerP = clamp((lanes().mid - e.clientY * D) / (lanes().gap * 1.05), -1, 1); }
+addEventListener('pointerdown', e => { if (phase !== 'play' || e.target.closest('button')) return; held = true; ptr(e); });
+addEventListener('pointermove', e => { if (held) ptr(e); });
+addEventListener('pointerup', () => held = false); addEventListener('pointercancel', () => held = false);
+
+let source = 'none';
+function updatePitch(dt, now){
+  let want = 0;
+  if (held){ want = pointerP; source = 'touch'; }
+  else if (keyDir){ want = keyDir; source = 'keys'; }
+  else if (pad.active){ want = pad.p; source = 'pad'; }
+  else if (faceLive(now) && calibrated){
+    const up = Math.max(0, face.up - base.up), dn = Math.max(0, face.down - base.down);
+    // the range grows to fit faces that move a lot, so big expressions don't feel stuck at the top
+    if (up > range.up * 1.15) range.up = Math.min(.6, range.up + (up / 1.15 - range.up) * ease(1.5, dt));
+    if (dn > range.down * 1.15) range.down = Math.min(.6, range.down + (dn / 1.15 - range.down) * ease(1.5, dt));
+    want = clamp(up / range.up - dn / range.down, -1, 1); source = 'face';
+  } else source = fl && camOK ? 'lost' : 'none';
+  P += (want - P) * ease(source === 'face' ? 10 : 14, dt);
+  if (lvl === 1){ if (P > .42) lvl = 2; else if (P < -.42) lvl = 0; }   // hysteresis, so a wobbly face doesn't flicker between notes
+  else if (lvl === 2){ if (P < .28) lvl = P < -.42 ? 0 : 1; }
+  else if (P > -.28) lvl = P > .42 ? 2 : 1;
+}
+
+/* ================= composing: your face plays a song over a gentle beat ================= */
+const BEAT = .6, BEATS = 24, LEN = BEAT * BEATS, CPB = 8;   // about 14 s. CPB: samples of the ink line per beat, kept in the link
+const STEPS5 = [0, 2, 5, 7, 9];   // a five-note (yo) scale, low to high
+const f5 = (root, l) => root * Math.pow(2, STEPS5[l] / 12);
+let lvl5 = 2;
+/* what each messenger carries, and what it tells the person who receives it */
+const MOOD = {
+  monkey: ['joy', '{who} wants to make you laugh.'],
+  bear: ['comfort', '{who} wants you to feel safe.'],
+  deer: ['tenderness', '{who} is thinking of you gently.'],
+  fox: ['mischief', '{who} has a secret smile for you.'],
+  owl: ['wonder', '{who} has been thinking about you.'],
+  cat: ['pride', '{who} is proud of you.'],
+  crane: ['longing', '{who} misses you.']
+};
+/* links always point at the published page, even when testing from a file */
+const BASE = location.protocol === 'https:' ? location.origin + location.pathname : 'https://devinhenriquez.github.io/devin/breath-song/';
+let phase = 'start', G = {}, mine = null, reply = null, camTried = false;   // mine: the song you just made. reply: who you're answering
+const sounding = () => source !== 'lost' && source !== 'none';
+
+function newCompose(){
+  G = {stage: 'scan', t: 0, scanT: 0, scanTot: null, samples: [], hist: [], rests: [], c0: 0, nextBeat: -4,
+       notes: null, contour: null, leader: null, bleed: 0, bleedTo: 0, noFace: 0};
+  acc.n = acc.mv = 0; acc.sum = {}; scan.n = scan.mv = scan.shown = 0; scan.sum = {}; lastLm = null;
+  calmUp.length = calmDown.length = 0; hints.length = 0; silLayer = null; sceneLayer = null; blobs = null; silKey = null;
+  for (let i = 0; i < BEATS; i++){ G.hist.push([0, 0, 0, 0, 0]); G.rests.push(0); }
+  $('bar').style.width = '0%'; setText($('sub'), '');
+  drone.set(NEUTRAL.root);
+}
+function click(t, accent){   // a soft wooden tick for the beat
+  const n = ac.createBufferSource(); n.buffer = noiseBuf;
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = accent ? 1500 : 2300; bp.Q.value = 5;
+  const g = ac.createGain(); g.gain.setValueAtTime(accent ? .16 : .09, t); g.gain.setTargetAtTime(0, t + .005, .018);
+  n.connect(bp).connect(g); send(g); n.start(t, Math.random()); n.stop(t + .15);
+  if (accent) taiko(t, .14);
+}
+function game(dt, now){
+  G.t += dt;
+  const big = G.stage === 'scan' && camOK;
+  $('portrait').classList.toggle('big', big); $('ring').toggleAttribute('hidden', !big);   // (SVG elements ignore .hidden)
+  drawDots(big);
+  G.bleed += (G.bleedTo - G.bleed) * ease(.7, dt);
+  if (G.stage === 'scan'){
+    setText($('hint'), 'The forest is reading you');
+    const NEED = 4;   // seconds of face
+    let done = false;
+    if (!fl || !camOK) done = G.t > .6;
+    else if (faceLive(now)) G.scanT += dt;
+    else setText($('sub'), 'Bring your face into the circle.');
+    $('ring-arc').setAttribute('stroke-dashoffset', 301.6 * (1 - clamp(G.scanT / NEED)));
+    if (G.scanT >= NEED || G.t > 14) done = true;
+    if (done){
+      let top = null;
+      if (scan.n > 10){
+        const f = {}; for (const k in scan.sum) f[k] = scan.sum[k] / scan.n; f.move = clamp(scan.mv / scan.n / .02); f.still = 1 - f.move;
+        G.scanTot = totals(f); top = Object.keys(G.scanTot).sort((a, b) => G.scanTot[b] - G.scanTot[a])[0];
+      }
+      setText($('hint'), top ? `The forest hears ${MOOD[top][0]} in you` : 'The forest is listening');
+      setText($('sub'), 'Let it into your song.');
+      taiko(ac.currentTime + .05, .3);
+      G.stage = 'heard'; G.t = 0;
+    }
+    return;
+  }
+  if (G.stage === 'heard'){ if (G.t > 2.6){ G.stage = 'calm'; G.t = 0; setText($('sub'), ''); } return; }
+  if (G.stage === 'calm'){
+    setText($('hint'), 'Relax your face');
+    let ready = false;
+    if (!fl || !camOK) ready = G.t > .8;   // no camera: straight on
+    else if (faceLive(now)){
+      setText($('sub'), 'Look at the screen with a calm, still face.');
+      if (calmUp.length > 30 || (calibrated && G.t > 1)){   // about 1.5 s of face; quicker the second time
+        if (calmUp.length > 10){ base.up = median(calmUp); base.down = median(calmDown); }
+        ready = true;
+      }
+    } else { setText($('sub'), 'Bring your face into view.'); G.noFace += dt; if (G.noFace > 8) ready = true; }
+    if (ready){ calibrated = true; G.stage = 'count'; G.c0 = ac.currentTime + .6 + 4 * BEAT; drone.level(.05); }
+    return;
+  }
+  if (G.stage === 'count' || G.stage === 'compose'){
+    const tc = ac.currentTime - G.c0;
+    // the beat: soft ticks, and a koto pluck on whatever note your face is on
+    while (G.nextBeat < BEATS && G.c0 + G.nextBeat * BEAT < ac.currentTime + .12){
+      const b = G.nextBeat, t = Math.max(G.c0 + b * BEAT, ac.currentTime);
+      click(t, (b + 4) % 4 === 0);
+      if (b >= 0 && sounding()) pluck(t, f5(NEUTRAL.root, lvl5), .1, 'koto');
+      G.nextBeat++;
+    }
+    const words = source === 'face' || source === 'lost';
+    if (tc < 0){
+      setText($('hint'), 'Play what you feel');
+      setText($('sub'), `${Math.ceil(-tc / BEAT)}`);
+    } else {
+      G.stage = 'compose';
+      const b = Math.min(BEATS - 1, Math.floor(tc / BEAT));
+      if (sounding()) G.hist[b][lvl5] += dt; else G.rests[b] += dt;
+      G.samples.push([clamp(tc / LEN), sounding() ? P : null]);
+      $('bar').style.width = clamp(tc / LEN) * 100 + '%';
+      setText($('sub'), source === 'lost' ? 'Bring your face back into view.' : tc < 5 ? (words ? 'Eyebrows up to rise · open your mouth to fall' : 'Up and down to play') : '');
+      if (tc >= LEN) finishCompose();
+    }
+    return;
+  }
+  if (G.stage === 'messenger' && G.t > 5.2) showSend();
+}
+function finishCompose(){
+  // one note per beat: whichever level your face held longest, or a rest
+  G.notes = G.hist.map((h, i) => { const m = Math.max(...h); return m === 0 || m < G.rests[i] ? '-' : String(h.indexOf(m)); }).join('');
+  // the ink line, resampled so it fits in a link
+  const N = BEATS * CPB, c = []; let j = 0;
+  for (let i = 0; i < N; i++){
+    const t = (i + .5) / N;
+    while (j < G.samples.length - 1 && G.samples[j + 1][0] <= t) j++;
+    const v = G.samples[j] ? G.samples[j][1] : null;
+    c.push(v == null ? '-' : Math.round((clamp(v, -1, 1) + 1) / 2 * 35).toString(36));
+  }
+  G.contour = c.join('');
+  G.leader = choose(); mine = {a: G.leader, n: G.notes, c: G.contour};
+  makeSil(G.leader); sceneLayer = sceneFor(G.leader); G.bleedTo = 1;
+  const A = ANIMALS[G.leader];
+  drone.set(A.root);
+  setText($('hint'), `Your song carries ${MOOD[G.leader][0]}`);
+  setText($('sub'), `The ${A.name} will take it to them.`);
+  playSong(G.notes.slice(0, 8), G.leader, ac.currentTime + 1);   // it learns your song: the first bars, in its own voice
+  G.stage = 'messenger'; G.t = 0; $('bar').style.width = '100%';
+}
+/* plays a song (a string of 24 beats: 0–4 or - for a rest) on an animal's instrument */
+function playSong(notes, k, t0, vol = .17){
+  const A = ANIMALS[k];
+  for (let i = 0; i < notes.length;){
+    const c = notes[i]; if (c === '-'){ i++; continue; }
+    let j = i + 1; while (j < notes.length && notes[j] === c) j++;
+    const f = f5(A.root, +c), t = t0 + i * BEAT, d = (j - i) * BEAT;
+    if (A.instr === 'flute') fluteNote(t, f, d * .95, vol);
+    else for (let q = i; q < j; q += 2) pluck(t + (q - i) * BEAT, f, (q === i ? vol : vol * .55) * 1.3, A.instr);
+    pluck(t, f / 2, vol * .35, 'koto');   // a soft low string under each new note
+    i = j;
+  }
+}
+
+/* ================= which animal carries it: your face in the scan, your face while you played, the shape of the song, and a little luck ================= */
+function choose(){
+  const forced = location.hash.slice(1), ks = Object.keys(ANIMALS);
+  if (ANIMALS[forced]) return forced;
+  const tot = Object.fromEntries(ks.map(k => [k, 0]));
+  const add = (t, w) => { for (const k of ks) tot[k] += t[k] * w; };
+  if (G.scanTot) add(G.scanTot, .5);
+  if (acc.n >= 10){
+    const f = {}; for (const k in acc.sum) f[k] = acc.sum[k] / acc.n; f.move = clamp(acc.mv / acc.n / .02); f.still = 1 - f.move;
+    add(totals(f), G.scanTot ? .5 : 1);
+  }
+  const ls = [...G.notes].filter(c => c !== '-').map(Number);
+  if (ls.length > 3){
+    const mean = ls.reduce((a, b) => a + b, 0) / ls.length, rests = 1 - ls.length / BEATS;
+    let jump = 0; for (let i = 1; i < ls.length; i++) jump += Math.abs(ls[i] - ls[i - 1]); jump /= ls.length - 1;
+    if (mean > 2.7){ tot.crane += .25; tot.owl += .12; }          // a high song
+    if (mean < 1.3) tot.bear += .3;                                // a low song
+    if (jump > 1.4){ tot.monkey += .22; tot.fox += .18; }          // a jumpy song
+    else if (jump < .7 && mean >= 1.3 && mean <= 2.7) tot.deer += .2;   // a smooth one
+    if (rests > .3) tot.owl += .1;                                 // lots of silence
+  }
+  const max = Math.max(...Object.values(tot));
+  const w = Object.fromEntries(ks.map(k => [k, Math.exp((tot[k] - max) / .12) * (k === lastAnimal ? .5 : 1)]));
+  let s = 0; for (const k of ks) s += w[k];
+  let r = Math.random() * s; for (const k of ks){ r -= w[k]; if (r <= 0) return k; }
+  return 'bear';
+}
+
+/* ================= sending: the whole song lives in the link ================= */
+const encode = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const decode = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
+function readIncoming(){
+  if (!location.hash.startsWith('#s=')) return null;
+  try {
+    const p = decode(location.hash.slice(3));
+    if (!ANIMALS[p.a] || !/^[0-4-]{24}$/.test(p.n) || !/^[0-9a-z-]{8,400}$/.test(p.c)) return null;
+    return {a: p.a, n: p.n, c: p.c, to: String(p.to || '').slice(0, 24), fr: String(p.fr || '').slice(0, 24), re: !!p.re};
+  } catch (e) { return null; }
+}
+function linkFor(){
+  const p = {a: mine.a, n: mine.n, c: mine.c};
+  const to = $('to').value.trim().slice(0, 24), fr = $('from').value.trim().slice(0, 24);
+  if (to) p.to = to; if (fr) p.fr = fr; if (reply) p.re = 1;
+  return BASE + '#s=' + encode(p);
+}
+function showSend(){
+  phase = 'send';
+  const A = ANIMALS[mine.a];
+  lastAnimal = mine.a; try { localStorage.setItem('breathsong-last', mine.a); } catch (e) {}
+  $('send-art').innerHTML = svgFor(mine.a); $('send-art').setAttribute('aria-label', 'An ink painting of a ' + A.name.toLowerCase());
+  $('send-name').textContent = 'The ' + A.name;
+  $('send-mood').textContent = `will carry your song. It carries ${MOOD[mine.a][0]}.`;
+  if (reply && reply.to) $('to').value = reply.to;
+  try { if (!$('from').value) $('from').value = localStorage.getItem('breathsong-from') || ''; } catch (e) {}
+  $('qr').hidden = true; $('send-art').hidden = false; $('qr-btn').textContent = 'Show QR'; setText($('sent-note'), '');
+  drone.level(.02, 2);
+  show('s-send');
+}
+function rememberName(){ try { localStorage.setItem('breathsong-from', $('from').value.trim()); } catch (e) {} }
+async function sendIt(){
+  rememberName();
+  const url = linkFor(), to = $('to').value.trim();
+  const text = (reply ? 'An answer' : 'A song') + (to ? ` for ${to}` : ' for you') + ', without words.';
+  if (navigator.share){
+    try { await navigator.share({title: 'Breath Song', text, url}); setText($('sent-note'), `Sent. The ${ANIMALS[mine.a].name} is on its way.`); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); setText($('sent-note'), 'Link copied. Paste it to them.'); }
+  catch (e) { setText($('sent-note'), url); }
+}
+let qrLib = null;
+async function toggleQR(){
+  if (!$('qr').hidden){ $('qr').hidden = true; $('send-art').hidden = false; $('qr-btn').textContent = 'Show QR'; return; }
+  rememberName();
+  if (!qrLib) qrLib = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'; s.onload = () => res(window.qrcode); s.onerror = rej; document.head.appendChild(s); });
+  try { const q = (await qrLib)(0, 'L'); q.addData(linkFor()); q.make(); $('qr').innerHTML = q.createSvgTag({cellSize: 4, margin: 2, scalable: true}); }
+  catch (e) { qrLib = null; setText($('sent-note'), "The QR code couldn't load. Use Send it instead."); return; }
+  $('qr').hidden = false; $('send-art').hidden = true; $('qr-btn').textContent = 'Hide QR';
+  setText($('sent-note'), 'They can scan this with their phone camera.');
+}
+
+/* ================= receiving: the animal arrives and plays the song, painting it as it goes ================= */
+function listen(p, preview = false){
+  if (!ac) audioInit();
+  phase = 'listen';
+  const N = p.c.length;
+  G = {stage: 'arrive', t: 0, leader: p.a, p, preview, bleed: 0, bleedTo: .6, prog: 0,
+       samples: [...p.c].map((ch, i) => [(i + .5) / N, ch === '-' ? null : parseInt(ch, 36) / 35 * 2 - 1])};
+  hints.length = 0; makeSil(p.a); sceneLayer = sceneFor(p.a);
+  drone.set(ANIMALS[p.a].root); drone.level(.05, 1);
+  $('bar').style.width = '0%'; $('portrait').hidden = true; setText($('foot'), '');
+  const who = p.fr || 'Someone';
+  setText($('hint'), preview ? 'This is what they will hear' : p.re ? `${who} answered your song` : `${who} sent you a song`);
+  setText($('sub'), `The ${ANIMALS[p.a].name} is bringing it.`);
+  show('s-play');
+}
+function listenTick(dt){
+  G.t += dt;
+  G.bleed += (G.bleedTo - G.bleed) * ease(.7, dt);
+  if (G.stage === 'arrive' && G.t > 2.6){ G.stage = 'song'; G.c0 = ac.currentTime + .3; playSong(G.p.n, G.p.a, G.c0); setText($('sub'), ''); }
+  if (G.stage === 'song'){
+    const tc = ac.currentTime - G.c0; G.prog = clamp(tc / LEN); $('bar').style.width = G.prog * 100 + '%';
+    if (tc > LEN + 1){ G.stage = 'end'; G.t = 0; G.bleedTo = 1; setText($('hint'), `It carries ${MOOD[G.leader][0]}.`); }
+  }
+  if (G.stage === 'end' && G.t > 2.4){ if (G.preview) backToSend(); else showHeard(); }
+}
+function showHeard(){
+  phase = 'heard';
+  const p = G.p, A = ANIMALS[p.a], [mood, line] = MOOD[p.a], who = p.fr || 'Someone';
+  $('heard-label').textContent = p.re ? `${who} answered you` : p.to ? `A song for ${p.to}` : 'A song for you';
+  $('heard-art').innerHTML = svgFor(p.a); $('heard-art').setAttribute('aria-label', 'An ink painting of a ' + A.name.toLowerCase());
+  $('heard-name').textContent = 'The ' + A.name;
+  $('heard-msg').textContent = `It carries ${mood}. ${line.replace('{who}', who)}`;
+  drone.level(.02, 2);
+  show('s-heard');
+}
+function backToSend(){ phase = 'send'; G = {stage: 'done', leader: mine.a, bleed: 0}; drone.level(.02, 2); show('s-send'); }
+
+/* ================= which animal came to you ================= */
+const WHY = {smile: 'a big smile', jaw: 'an open mouth', move: 'how much you moved', still: 'how still you stayed', blink: 'soft, half-closed eyes',
+  away: 'a gaze that wandered', tilt: 'a tilted head', stare: 'a steady stare', brow: 'raised eyebrows', chin: 'your chin held high', up: 'eyes turned upward'};
+function scores(f){
+  const calm = 1 - Math.max(f.smile, f.jaw, f.brow);
+  return {
+    monkey: {smile: 1.2 * f.smile, jaw: 1.2 * f.jaw, move: 1.0 * f.move},
+    bear:   {still: .6 * f.still * calm, base: .15},   // wins when nothing else stands out
+    deer:   {blink: 1.0 * f.blink, away: .9 * f.away, smile: .5 * f.smile * (1 - f.jaw)},
+    fox:    {tilt: 1.2 * f.tilt, stare: .9 * f.stare},
+    owl:    {brow: 1.4 * f.brow, still: .5 * f.still},
+    cat:    {chin: 1.4 * f.chin, smile: .7 * f.smile * (1 - f.jaw)},
+    crane:  {up: 1.4 * f.up, chin: .3 * f.chin, jaw: .4 * f.jaw * (1 - f.smile)}
+  };
+}
+const totals = f => { const sc = scores(f), t = {}; for (const k in sc) t[k] = Object.values(sc[k]).reduce((a, b) => a + b, 0); return t; };
+let lastAnimal = null; try { lastAnimal = localStorage.getItem('breathsong-last'); } catch (e) {}
+
+/* ================= drawing: ink on old paper ================= */
+const cv = $('stage'), g = cv.getContext('2d');
+let W, H, D = 1, bg, silLayer = null, silKey = null, silImg = null, blobs = null, sceneLayer = null;
+const narrow = () => innerWidth < 600;
+function size(){
+  D = Math.min(devicePixelRatio || 1, 2);
+  W = cv.width = Math.round(innerWidth * D); H = cv.height = Math.round(innerHeight * D);
+  bg = paint(W, H, D, narrow());
+  if (silKey) buildSil();
+  if (G.leader) sceneLayer = sceneFor(G.leader);
+}
+function paint(W, H, D, narrow){
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const b = c.getContext('2d'), R = rng(11), M = Math.max(W, H);
+  // paper
+  const pg = b.createRadialGradient(W * .5, H * .42, 0, W * .5, H * .45, M * .75);
+  pg.addColorStop(0, '#EEE0C2'); pg.addColorStop(.5, '#E0CBA4'); pg.addColorStop(1, '#B7966A');
+  b.fillStyle = pg; b.fillRect(0, 0, W, H);
+  for (let i = 0; i < 46; i++){   // stains
+    const x = R() * W, y = R() * H, r = (40 + R() * 220) * D, s = b.createRadialGradient(x, y, 0, x, y, r);
+    s.addColorStop(0, `rgba(130,92,50,${.03 + R() * .06})`); s.addColorStop(1, 'rgba(130,92,50,0)');
+    b.fillStyle = s; b.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const t = document.createElement('canvas'); t.width = t.height = 160;   // grain
+  const tx = t.getContext('2d'), id = tx.createImageData(160, 160);
+  for (let i = 0; i < id.data.length; i += 4){ const v = R(); id.data[i] = 90; id.data[i + 1] = 62; id.data[i + 2] = 35; id.data[i + 3] = v < .5 ? v * 34 : 0; }
+  tx.putImageData(id, 0, 0); b.fillStyle = b.createPattern(t, 'repeat'); b.fillRect(0, 0, W, H);
+  b.lineWidth = .7 * D;
+  for (let i = 0; i < 180; i++){   // fibers
+    const x = R() * W, y = R() * H, l = (10 + R() * 40) * D, a = R() * 6.28;
+    b.strokeStyle = `rgba(${R() < .5 ? '90,60,30' : '250,240,220'},${.05 + R() * .06})`;
+    b.beginPath(); b.moveTo(x, y); b.quadraticCurveTo(x + Math.cos(a) * l * .5 + 4 * D, y + Math.sin(a) * l * .5, x + Math.cos(a) * l, y + Math.sin(a) * l); b.stroke();
+  }
+  // a far mountain in a pale wash, with a light cap
+  const peakX = W * (narrow ? .55 : .58), peakY = H * .36, baseY = H * .72;
+  const mg = b.createLinearGradient(0, peakY, 0, baseY); mg.addColorStop(0, 'rgba(60,44,30,.22)'); mg.addColorStop(1, 'rgba(60,44,30,0)');
+  b.fillStyle = mg; b.beginPath(); b.moveTo(-10, baseY);
+  b.bezierCurveTo(W * .2, baseY - H * .06, peakX - W * .22, peakY + H * .12, peakX - W * .03, peakY + H * .01);
+  b.lineTo(peakX + W * .03, peakY + H * .006);
+  b.bezierCurveTo(peakX + W * .2, peakY + H * .12, W * .9, baseY - H * .1, W + 10, baseY - H * .05);
+  b.lineTo(W + 10, baseY + 10); b.lineTo(-10, baseY + 10); b.fill();
+  b.fillStyle = 'rgba(240,230,205,.55)'; b.beginPath();
+  b.moveTo(peakX - W * .03, peakY + H * .01); b.lineTo(peakX + W * .03, peakY + H * .006);
+  b.lineTo(peakX + W * .07, peakY + H * .045); b.lineTo(peakX + W * .03, peakY + H * .035); b.lineTo(peakX, peakY + H * .05);
+  b.lineTo(peakX - W * .035, peakY + H * .036); b.lineTo(peakX - W * .07, peakY + H * .05); b.fill();
+  // nearer hills, darker
+  b.fillStyle = 'rgba(45,33,22,.22)'; b.beginPath(); b.moveTo(-10, H);
+  for (let x = -10; x <= W + 10; x += 6 * D){ const u = x / W; b.lineTo(x, H * (.76 + .03 * Math.sin(u * 7 + 1) + .015 * Math.sin(u * 19) - .04 * Math.exp(-((u - .2) ** 2) / .01))); }
+  b.lineTo(W + 10, H); b.fill();
+  const mist = b.createLinearGradient(0, H * .66, 0, H * .82); mist.addColorStop(0, 'rgba(232,218,190,0)'); mist.addColorStop(.5, 'rgba(232,218,190,.45)'); mist.addColorStop(1, 'rgba(232,218,190,0)');
+  b.fillStyle = mist; b.fillRect(0, H * .66, W, H * .16);
+  // dry-brush grass along the bottom, leaning with the wind
+  for (let i = 0; i < 300; i++){
+    const x = R() * (W + 40 * D) - 20 * D, edge = Math.abs(x / W - .5) * 2;
+    const h = H * (.05 + R() * .11 + edge * .07), w = (1 + R() * 2.6) * D, lean = (14 + R() * 40) * D, yb = H + 4 * D;
+    b.fillStyle = `rgba(34,27,20,${.35 + R() * .55})`;
+    b.beginPath(); b.moveTo(x - w, yb); b.quadraticCurveTo(x + lean * .25, yb - h * .6, x + lean, yb - h);
+    b.quadraticCurveTo(x + lean * .25 + w * .4, yb - h * .55, x + w, yb); b.fill();
+  }
+  for (let i = 0; i < 70; i++){ b.fillStyle = `rgba(34,27,20,${.2 + R() * .5})`; b.beginPath(); b.arc(R() * W, H * (.86 + R() * .14), (.5 + R() * 2) * D, 0, 7); b.fill(); }
+  // burnt, darkened edges
+  const v = b.createRadialGradient(W * .5, H * .48, Math.min(W, H) * .3, W * .5, H * .48, M * .78);
+  v.addColorStop(0, 'rgba(80,50,22,0)'); v.addColorStop(.7, 'rgba(80,50,22,.28)'); v.addColorStop(1, 'rgba(40,24,10,.78)');
+  b.fillStyle = v; b.fillRect(0, 0, W, H);
+  return c;
+}
+/* each animal brings part of its world into the painting (kept to the left and top, away from the threads and the animal) */
+function leafPath(b, x, y, len, wid, ang){
+  b.save(); b.translate(x, y); b.rotate(ang); b.beginPath(); b.moveTo(0, 0);
+  b.quadraticCurveTo(len * .5, -wid, len, 0); b.quadraticCurveTo(len * .5, wid, 0, 0); b.fill(); b.restore();
+}
+function maple(b, x, y, r, ang){
+  b.save(); b.translate(x, y); b.rotate(ang); b.beginPath();
+  for (let i = 0; i < 10; i++){ const a = -1.571 + i * .628, rr = i % 2 ? r * .42 : r; i ? b.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : b.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+  b.closePath(); b.fill(); b.restore();
+}
+function sceneFor(k){
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const b = c.getContext('2d'), R = rng(k.length * 13 + 5), m = Math.min(W, H), nr = narrow();
+  b.lineCap = 'round'; b.lineJoin = 'round';
+  const sx = nr ? W * .2 : W * .2, sy = H * .2;
+  if (k === 'owl'){
+    const r = m * .09; b.fillStyle = 'rgba(247,241,226,.9)'; b.beginPath(); b.arc(sx, sy, r, 0, 7); b.fill();
+    b.strokeStyle = 'rgba(34,27,20,.22)'; b.lineWidth = 1.5 * D; b.stroke();
+    b.strokeStyle = 'rgba(34,27,20,.16)'; b.lineWidth = 4 * D;
+    for (let i = 0; i < 3; i++){ const y = sy + (i - .6) * r * .7; b.beginPath(); b.moveTo(sx - r * 1.8 + i * r * .4, y); b.bezierCurveTo(sx - r * .5, y - 6 * D, sx + r * .4, y + 6 * D, sx + r * 1.6, y - 2 * D); b.stroke(); }
+  } else if (k === 'bear'){
+    const r = m * .1; b.fillStyle = 'rgba(168,50,42,.62)'; b.beginPath(); b.arc(sx, sy + r * .3, r, 0, 7); b.fill();
+    b.strokeStyle = 'rgba(232,218,190,.6)'; b.lineWidth = 5 * D;
+    for (let i = 0; i < 2; i++){ const y = sy + r * (.5 + i * .4); b.beginPath(); b.moveTo(sx - r * 1.5, y); b.lineTo(sx + r * 1.4, y + 3 * D); b.stroke(); }
+  } else if (k === 'fox'){
+    const s = m * .12, x = W * (nr ? .16 : .1), y = H * .83;
+    b.fillStyle = 'rgba(168,50,42,.82)';
+    b.fillRect(x - s * .36, y - s, s * .08, s); b.fillRect(x + s * .28, y - s, s * .08, s);
+    b.fillRect(x - s * .48, y - s * .78, s * .96, s * .07);
+    b.beginPath(); b.moveTo(x - s * .62, y - s * 1.02); b.quadraticCurveTo(x, y - s * .92, x + s * .62, y - s * 1.02);
+    b.lineTo(x + s * .56, y - s * .9); b.quadraticCurveTo(x, y - s * .82, x - s * .56, y - s * .9); b.fill();
+    b.fillStyle = 'rgba(34,27,20,.75)'; b.fillRect(x - s * .64, y - s * 1.06, s * 1.28, s * .05);
+  } else if (k === 'crane'){
+    b.strokeStyle = 'rgba(34,27,20,.22)'; b.lineWidth = 2 * D;
+    for (let i = 0; i < 9; i++){ const y = H * (.79 + i * .012), x0 = R() * W * .4; b.beginPath(); b.moveTo(x0, y); b.lineTo(x0 + W * (.08 + R() * .2), y); b.stroke(); }
+    for (let i = 0; i < 46; i++){
+      const x = R() * W * .36, h = H * (.12 + R() * .2) * (nr ? .6 : 1), lean = (R() - .3) * 30 * D, yb = H * .9;
+      b.strokeStyle = `rgba(34,27,20,${.35 + R() * .4})`; b.lineWidth = (1 + R() * 1.6) * D;
+      b.beginPath(); b.moveTo(x, yb); b.quadraticCurveTo(x + lean * .3, yb - h * .6, x + lean, yb - h); b.stroke();
+      if (R() < .35){ b.fillStyle = 'rgba(34,27,20,.6)'; b.beginPath(); b.ellipse(x + lean, yb - h - 6 * D, 2.4 * D, 8 * D, lean / (60 * D), 0, 7); b.fill(); }
+    }
+  } else if (k === 'deer'){
+    for (let i = 0; i < 5; i++){
+      const x = W * (.02 + i * .04 + R() * .02), w = (7 + R() * 7) * D, a = .45 + R() * .3;
+      b.fillStyle = `rgba(34,27,20,${a})`;
+      for (let y = H; y > -H * .1;){ const seg = H * (.1 + R() * .06); b.fillRect(x - w / 2, y - seg + 2.5 * D, w, seg - 2.5 * D); y -= seg; }
+      for (let j = 0; j < 4; j++){ const y = H * (.1 + R() * .6); for (let q = 0; q < 4; q++) leafPath(b, x, y, (30 + R() * 30) * D, (4 + R() * 3) * D, .2 + q * .35 + R() * .3); }
+    }
+  } else if (k === 'monkey'){
+    const bx = W * (nr ? .7 : .46), by = H * .2;
+    b.strokeStyle = 'rgba(34,27,20,.8)'; b.lineWidth = 14 * D;
+    b.beginPath(); b.moveTo(-10, H * .04); b.bezierCurveTo(bx * .3, H * .06, bx * .6, by * .9, bx, by); b.stroke();
+    const twigs = [];
+    for (let i = 0; i < 7; i++){
+      const u = .15 + i * .12, x = bx * u, y = H * .04 + (by - H * .04) * u * u, len = (50 + R() * 50) * D, a = 1.1 + (R() - .5) * .9;
+      b.lineWidth = (5 - i * .4) * D; b.beginPath(); b.moveTo(x, y);
+      const ex = x + Math.cos(a) * len * .5, ey = y + Math.sin(a) * len; b.quadraticCurveTo(x + 14 * D, y + len * .4, ex, ey); b.stroke(); twigs.push([ex, ey]);
+    }
+    for (const [tx, ty] of twigs) for (let j = 0; j < 7; j++){ b.fillStyle = `rgba(168,50,42,${.55 + R() * .4})`; maple(b, tx + (R() - .5) * 60 * D, ty + (R() - .5) * 46 * D, (10 + R() * 8) * D, R() * 6); }
+  } else if (k === 'cat'){
+    // a temple roof seen from the side: ridge, sloping tiles, an upturned corner, and the wall below
+    const x1 = W * (nr ? .5 : .3), y0 = H * .72, h = Math.min(H * .07, x1 * .25);
+    b.fillStyle = 'rgba(34,27,20,.28)'; b.fillRect(-10, y0 + h, x1 * .86, H);
+    b.fillStyle = 'rgba(34,27,20,.45)';
+    for (let x = x1 * .12; x < x1 * .8; x += x1 * .22) b.fillRect(x, y0 + h, 7 * D, H);
+    b.fillStyle = 'rgba(34,27,20,.78)'; b.beginPath();
+    b.moveTo(-10, y0 - 4 * D); b.lineTo(x1 * .7, y0 - 4 * D); b.lineTo(x1 * .72, y0 + 2 * D);
+    b.quadraticCurveTo(x1 * .9, y0 + h * .6, x1 * .97, y0 + h * .55); b.lineTo(x1, y0 + h * .2);
+    b.quadraticCurveTo(x1 * .99, y0 + h * .9, x1 * .92, y0 + h * 1.15);
+    b.quadraticCurveTo(x1 * .55, y0 + h * 1.05, -10, y0 + h * 1.2); b.fill();
+    b.strokeStyle = 'rgba(232,218,190,.3)'; b.lineWidth = 1.4 * D;
+    for (let x = 10 * D; x < x1 * .85; x += 11 * D){ b.beginPath(); b.moveTo(x, y0 + 4 * D); b.lineTo(x + 3 * D, y0 + h * 1.05); b.stroke(); }
+  }
+  return c;
+}
+function makeSil(k){
+  silKey = k; silLayer = null;
+  svgImage(k).then(i => { if (silKey === k){ silImg = i; buildSil(); } });
+  const R = rng(k.length * 31 + 7);
+  blobs = Array.from({length: 54}, () => { const x = R(), y = .1 + R() * .9; return {x, y, r: .09 + R() * .14, d: Math.hypot(x - .5, y - .6) + R() * .25}; }).sort((a, b) => a.d - b.d);
+}
+function buildSil(){
+  if (!silImg) return;
+  const S = Math.round(narrow() ? Math.min(W * .56, H * .34) : Math.min(W * .4, H * .46));
+  silLayer = document.createElement('canvas'); silLayer.width = silLayer.height = S;
+  silLayer.getContext('2d').drawImage(silImg, 0, 0, S, S);
+}
+addEventListener('resize', size);
+/* the song is painted as one ink line across the scroll: left to right is time, up and down is pitch */
+function band(){ return {mid: H * .47, half: H * .17}; }
+function lanes(){ const b = band(); return {mid: b.mid, gap: b.half / 1.05}; }   // for touch input
+const yV = v => band().mid - v * band().half;
+const xT = t => W * .08 + t * W * .84;
+const ash = Array.from({length: 26}, () => ({x: Math.random(), y: Math.random(), r: .6 + Math.random() * 1.4, s: .3 + Math.random()}));
+const hints = [];
+let lineA = 0, silA = 0, hintT = 0, sceneShow = 0;
+const THREAD = 'rgba(38,92,72,';   // ink with a little jade in it
+
+function draw(now, dt){
+  const t = now / 1000;
+  g.drawImage(bg, 0, 0);
+  // the messenger's world fades in behind it
+  const sceneTo = phase === 'listen' ? (G.stage === 'arrive' ? .5 : 1) : (phase === 'play' && G.stage === 'messenger') ? 1 : (phase === 'send' || phase === 'heard') ? .25 : 0;
+  sceneShow += (sceneTo - sceneShow) * ease(1.2, dt);
+  if (sceneLayer && sceneShow > .01){ g.globalAlpha = sceneShow; g.drawImage(sceneLayer, 0, 0); g.globalAlpha = 1; }
+  // the animal painting itself into the landscape
+  const showSil = (phase === 'listen' || (phase === 'play' && G.stage === 'messenger')) && silLayer && G.bleed > .003;
+  silA += ((showSil ? 1 : 0) - silA) * ease(showSil ? 2 : 4, dt);
+  if (silLayer && blobs && silA > .01){
+    const S = silLayer.width, sx = W * (narrow() ? .7 : .8) - S / 2, sy = H * (narrow() ? .93 : .985) - S;
+    const k = (G.bleed || 0) * blobs.length;
+    g.save(); g.beginPath();
+    for (let i = 0; i < blobs.length && i < k; i++){ const b = blobs[i], r = b.r * S * clamp(k - i); g.moveTo(sx + b.x * S + r, sy + b.y * S); g.arc(sx + b.x * S, sy + b.y * S, r, 0, 7); }
+    g.clip(); g.globalAlpha = silA * (G.stage === 'end' || G.stage === 'messenger' ? .7 : .45);
+    g.drawImage(silLayer, sx, sy); g.restore(); g.globalAlpha = 1;
+  }
+  drawHints(t, dt);
+  // ash drifting in the wind
+  g.fillStyle = 'rgba(34,27,20,.28)'; g.beginPath();
+  for (const m of ash){
+    m.x += dt * .012 * m.s; m.y += Math.sin(t * .7 + m.s * 9) * dt * .004;
+    if (m.x > 1.02) m.x = -.02;
+    const x = m.x * W, y = m.y * H, r = m.r * D; g.moveTo(x + r, y); g.arc(x, y, r, 0, 7);
+  }
+  g.fill();
+  const composing = phase === 'play' && ['calm', 'count', 'compose', 'messenger'].includes(G.stage);
+  const listening = phase === 'listen' && G.stage !== 'arrive';
+  lineA += ((composing || listening ? 1 : 0) - lineA) * ease(composing || listening ? 3 : 1.5, dt);
+  if (lineA > .01) drawMelody(t);
+}
+function drawMelody(t){
+  g.save(); g.globalAlpha = lineA; g.lineCap = 'round'; g.lineJoin = 'round';
+  if (phase === 'play' && G.stage !== 'messenger'){   // five faint guides while you play
+    for (let l = 0; l < 5; l++){
+      const y = yV((l - 2) / 2); g.strokeStyle = `rgba(34,27,20,${l === 2 ? .13 : .07})`; g.lineWidth = 1 * D;
+      g.beginPath(); g.moveTo(W * .06, y); g.lineTo(W * .94, y); g.stroke();
+    }
+  }
+  const pts = G.samples || [], upto = phase === 'listen' ? (G.stage === 'song' ? G.prog : 1) : 1;
+  // split into strokes wherever there was silence
+  const segs = []; let cur = [];
+  for (const [s, v] of pts){
+    if (s > upto) break;
+    if (v == null){ if (cur.length) segs.push(cur); cur = []; continue; }
+    cur.push([xT(s), yV(v)]);
+  }
+  if (cur.length) segs.push(cur);
+  for (const [w, col, off] of [[13, 'rgba(34,27,20,.06)', 0], [3.4, 'rgba(34,27,20,.85)', 0], [1.1, THREAD + '.45)', 5], [1, THREAD + '.35)', -5]]){
+    g.strokeStyle = col; g.lineWidth = w * D;
+    for (const sg of segs){
+      g.beginPath();
+      sg.forEach(([x, y], i) => { const yy = y + off * D * Math.sin(x / (40 * D) + t * .8); i ? g.lineTo(x, yy) : g.moveTo(x, yy); });
+      if (sg.length === 1) g.lineTo(sg[0][0] + .1, sg[0][1] + off * D * Math.sin(sg[0][0] / (40 * D) + t * .8));
+      g.stroke();
+    }
+  }
+  // the brush: where you are now (or where the animal is in the song)
+  let px = null, py = null;
+  if (phase === 'play' && ['calm', 'count', 'compose'].includes(G.stage) && sounding()){
+    px = xT(G.stage === 'compose' ? clamp((ac.currentTime - G.c0) / LEN) : 0); py = yV(P);
+  } else if (phase === 'listen' && G.stage === 'song' && segs.length){
+    const last = segs[segs.length - 1], end = last[last.length - 1];
+    const lastS = pts.filter(([s, v]) => s <= upto && v != null).pop();
+    if (lastS && upto - lastS[0] < .02){ px = end[0]; py = end[1]; }
+  }
+  if (px != null){
+    g.fillStyle = 'rgba(34,27,20,.16)'; g.beginPath(); g.arc(px, py, 17 * D, 0, 7); g.fill();
+    g.fillStyle = INK; g.beginPath(); g.arc(px, py, 8 * D, 0, 7); g.fill();
+  }
+  // a red seal where the song ends
+  if ((phase === 'play' && G.stage === 'messenger') || (phase === 'listen' && G.stage === 'end')){
+    g.fillStyle = SEAL; g.save(); g.translate(xT(1) + 14 * D, yV(-1) + 6 * D); g.rotate(.1); g.fillRect(-7 * D, -7 * D, 14 * D, 14 * D); g.restore();
+  }
+  g.restore();
+}
+/* signs of the messenger: feathers, paw prints, maple leaves, bamboo leaves, foxfire */
+function drawHints(t, dt){
+  const active = (phase === 'listen' && G.stage !== 'arrive') || (phase === 'play' && G.stage === 'messenger');
+  const kind = active && G.leader ? ANIMALS[G.leader].hint : null;
+  if (kind){
+    hintT -= dt;
+    if (hintT <= 0){
+      hintT = kind === 'paw' ? .55 : .8 + Math.random() * .7;
+      if (kind === 'paw'){
+        const k = hints.filter(h => h.kind === 'paw').length, side = k % 2;
+        const prog = (G.pawN = (G.pawN || 0) + 1) % 22;
+        hints.push({kind, x: W * (.95 - prog * .04), y: H * (.9 + (side ? .018 : -.018)), life: 1, a: -1.3});
+      } else if (kind === 'flame'){
+        hints.push({kind, x: W * (.55 + Math.random() * .4), y: H * (.6 + Math.random() * .3), vy: -(14 + Math.random() * 14) * D, life: 1, ph: Math.random() * 6});
+      } else {
+        hints.push({kind, x: W * (.3 + Math.random() * .75), y: -20 * D, vx: -(16 + Math.random() * 30) * D, vy: (24 + Math.random() * 26) * D, life: 1, a: Math.random() * 6, spin: (Math.random() - .5) * 2, ph: Math.random() * 6});
+      }
+    }
+  }
+  for (let i = hints.length - 1; i >= 0; i--){
+    const h = hints[i];
+    if (!active) h.life -= dt * 1.5;
+    if (h.kind === 'paw'){ h.life -= dt * .22; }
+    else if (h.kind === 'flame'){ h.life -= dt * .35; h.y += h.vy * dt; }
+    else { h.x += (h.vx + Math.sin(t * 1.6 + h.ph) * 30 * D) * dt; h.y += h.vy * dt; h.a += h.spin * dt; if (h.y > H * .95) h.life -= dt * 1.2; }
+    if (h.life <= 0 || h.x < -40 * D){ hints.splice(i, 1); continue; }
+    const a = clamp(h.life * 1.5);
+    g.save(); g.translate(h.x, h.y);
+    if (h.kind === 'paw'){
+      g.fillStyle = `rgba(34,27,20,${.45 * a})`; g.rotate(h.a);
+      g.beginPath(); g.ellipse(0, 0, 6 * D, 5 * D, 0, 0, 7); g.fill();
+      for (const [px, py] of [[-6, -7], [-2, -10], [3, -10], [7, -7]]){ g.beginPath(); g.arc(px * D, py * D, 2 * D, 0, 7); g.fill(); }
+    } else if (h.kind === 'flame'){
+      const f = 1 + .15 * Math.sin(t * 9 + h.ph);
+      g.fillStyle = `rgba(168,50,42,${.55 * a})`; g.beginPath(); g.moveTo(0, -14 * D * f);
+      g.quadraticCurveTo(7 * D, -2 * D, 0, 6 * D); g.quadraticCurveTo(-7 * D, -2 * D, 0, -14 * D * f); g.fill();
+    } else if (h.kind === 'maple'){
+      g.fillStyle = `rgba(168,50,42,${.7 * a})`; maple(g, 0, 0, 9 * D, h.a);
+    } else if (h.kind === 'bamboo'){
+      g.fillStyle = `rgba(34,27,20,${.55 * a})`; leafPath(g, -20 * D, 0, 40 * D, 5 * D, h.a);
+    } else {   // feather
+      g.rotate(h.a); g.fillStyle = `rgba(34,27,20,${.45 * a})`; leafPath(g, -18 * D, 0, 36 * D, 7 * D, 0);
+      g.strokeStyle = `rgba(232,218,190,${.6 * a})`; g.lineWidth = 1 * D; g.beginPath(); g.moveTo(-20 * D, 0); g.lineTo(16 * D, 0); g.stroke();
+    }
+    g.restore();
+  }
+}
+
+/* ================= your voice: a shakuhachi that follows your face ================= */
+let heldOn = 0, heldLvl = -1;
+function voiceTick(dt){
+  if (!player) return;
+  const playing = phase === 'play' && ['calm', 'count', 'compose'].includes(G.stage) && sounding();
+  const f = f5(NEUTRAL.root, lvl5) * Math.pow(2, ((P + 1) * 2 - lvl5) * .7 / 12);   // snaps to the note, with a little bend
+  heldOn = lvl5 === heldLvl ? heldOn + dt : 0; heldLvl = lvl5;
+  const T = ac.currentTime, k = playing ? (G.stage === 'calm' ? .5 : 1) : 0;
+  player.o.frequency.setTargetAtTime(f, T, .05);
+  player.bp.frequency.setTargetAtTime(f, T, .05);
+  player.lg.gain.setTargetAtTime(heldOn > .5 ? f * .012 : f * .002, T, .3);   // vibrato blooms when you hold a note
+  player.lp.frequency.setTargetAtTime(2600, T, .12);
+  player.amp.gain.setTargetAtTime(k * .13, T, .08);
+  player.bg.gain.setTargetAtTime(k * .05, T, .08);
+  player.hg.gain.setTargetAtTime(k * .012, T, .1);
+}
+
+/* ================= flow ================= */
+async function begin(){
+  if (phase === 'wake') return;
+  phase = 'wake';
+  if (!ac) audioInit();
+  show('s-wake');
+  if (!camTried){
+    camTried = true;
+    const loading = loadFace();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'user', width: {ideal: 640}, height: {ideal: 480}}});
+      cam.srcObject = stream; await cam.play().catch(() => {}); camOK = true;
+      $('wake-text').textContent = 'Loading the face reader…';
+      fl = await Promise.race([loading, sleep(15000).then(() => null)]);
+    } catch (e) { camOK = false; }
+  }
+  $('portrait').hidden = !camOK;
+  setText($('foot'), fl && camOK ? '' : 'The camera is off. Press and drag up or down to play (or use the arrow keys).');
+  drone.level(.03, .6);
+  newCompose(); phase = 'play'; show('s-play');
+}
+const incoming = readIncoming();
+if (incoming){
+  const who = incoming.fr || 'Someone';
+  $('recv-title').textContent = incoming.re ? `${who} answered your song` : `${who} sent you a song`;
+  show('s-recv');
+}
+$('begin').onclick = begin;
+$('listen').onclick = () => listen(incoming);
+$('relisten').onclick = () => listen(G.p);
+$('answer').onclick = () => {
+  reply = {to: G.p.fr || ''};
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}   // the old song leaves the address bar
+  begin();
+};
+$('send').onclick = sendIt;
+$('qr-btn').onclick = toggleQR;
+$('preview').onclick = () => { rememberName(); listen({...mine, fr: $('from').value.trim(), to: $('to').value.trim(), re: !!reply}, true); };
+$('redo').onclick = () => { reply = null; $('to').value = ''; begin(); };
+
+/* ================= main loop ================= */
+/* add ?debug to the URL to see what the camera reads (for tuning) */
+const DEBUG = /[?&]debug/.test(location.search) ? Object.assign(document.body.appendChild(document.createElement('pre')),
+  {style: 'position:fixed;left:8px;bottom:8px;z-index:5;margin:0;font:12px/1.4 ui-monospace,monospace;color:#221B14;background:rgba(230,213,178,.85);padding:6px 8px;border-radius:6px;pointer-events:none'}) : null;
+size();
+let last = performance.now();
+function tick(now){
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  requestAnimationFrame(tick);   // scheduled first, so one bad frame can't stop the page
+  readPad(now);
+  detect(now);
+  updatePitch(dt, now);
+  const raw = (P + 1) * 2; if (Math.abs(raw - lvl5) > .62) lvl5 = clamp(Math.round(raw), 0, 4);   // five notes, with a little hysteresis
+  $('portrait').classList.toggle('lost', !!(fl && camOK && phase === 'play' && !faceLive(now)));
+  if (phase === 'play') game(dt, now);
+  else if (phase === 'listen') listenTick(dt);
+  if (ac) voiceTick(dt);
+  draw(now, dt);
+  if (DEBUG) setText(DEBUG, `src ${source}  P ${P.toFixed(2)}  note ${lvl5}\nup ${(face.up - base.up).toFixed(2)} / ${range.up.toFixed(2)}  down ${(face.down - base.down).toFixed(2)} / ${range.down.toFixed(2)}\nphase ${phase}  stage ${G.stage || '-'}  messenger ${G.leader || '-'}`);
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
